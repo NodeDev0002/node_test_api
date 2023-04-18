@@ -7,6 +7,8 @@ const http = require('http');
 const jwt = require('jsonwebtoken');
 const userModel = require('./models/user_model.js');
 const testModel = require('./models/test_model.js');
+const postModel = require('./models/post_model.js');
+
 
 const app = express();
 app.use(express.json());
@@ -53,8 +55,11 @@ app.get("/getUser/paginate",  paginatedResults(testModel), (req, res) => {
  function paginatedResults(model) {
     // middleware function
     return async (req, res, next)  => {
-        const page = parseInt(req.query.page);
-        const limit = parseInt(req.query.limit);
+        const page = parseInt(req.query.page ?? "1");
+        const limit = parseInt(req.query.limit ?? "10");
+        if (page <= 0) { 
+            page = 1;
+        }
 
         // calculating the starting and ending index
         const startIndex = (page - 1) * limit;
@@ -62,7 +67,7 @@ app.get("/getUser/paginate",  paginatedResults(testModel), (req, res) => {
 
         const results = {};
         results.totalCount = await testModel.count;
-        // if (endIndex < model.length) {
+        // if (endIndex < model.length) {        
             results.next = {
                 page: page + 1,
                 limit: limit
@@ -79,20 +84,70 @@ app.get("/getUser/paginate",  paginatedResults(testModel), (req, res) => {
         // var data = await testModel.find();
         // var data = await testModel.find().skip(startIndex * limit).limit(limit);
         results.results = await model.find().skip(startIndex * limit).limit(limit);;
-        results.idData = await model.findById('5eb3d668b31de5d588f4292b');
-        
         // results.results = data.slice(startIndex, endIndex);
-
         res.paginatedResults = results;
         next();
     };
 }
 
 
+app.get("/getDataByID", async (req, res) => {
+    try { 
+        var id = req.query.id;
+        var postId = req.query.postId;
+
+        const userData = await testModel.findById(id);
+        // const postData = await postModel.findById(postId);  
+        const postData = await postModel.find();  
+        return res.status(200).json({ status: true, message: "Data Got Success", user: userData ?? {}, post: postData ?? {} });
+    } catch (err) {
+        console.log(err);
+        return res.status(400).json({ status: false, message: "Something went wrong"});
+    }
+
+
+ });
+
+app.post('/addData', async (req, res) => {
+    try {
+        const { studentId, scores, classId } = req.body;
+
+        const testData = await testModel.create(
+                    {
+                student_id: studentId,
+                scores: scores,
+                class_id: classId
+            }
+        ); 
+        await testData.save();
+        res.status(200).json({ status: true, message: "Data Savved.. ", user: testData });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ status: false, message: "Failed to saving data" });
+    }
+});
 
 
 
+app.post('/updateData', async (req, res) => {
+    try {
+        const { _id, studentId, scores, classId } = req.body;
 
+       const updatesData = await testModel.findOneAndUpdate(
+            { _id:  _id},
+            {
+                student_id: studentId,
+                scores: scores,
+                class_id: classId
+            },
+            { new: true }
+        );
+        res.status(200).json({ status: true, message: "Your data has been updated..!", user: updatesData });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ status: false, message: "Failed to saving data" });
+    }
+});
 
 
 app.post('/addUser', async (req, res) => {
@@ -105,7 +160,6 @@ app.post('/addUser', async (req, res) => {
             country: country,
             address: address
         }]);
-        // newData.inser;
         res.status(200).json({ status: true, message: "Data Savved.. ", user: userModel });
 
     } catch (error) {
